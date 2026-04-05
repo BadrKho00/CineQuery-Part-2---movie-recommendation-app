@@ -1,0 +1,24 @@
+services:
+
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      GCP_PROJECT_ID: mscis-488614
+      BQ_DATASET: movielens
+      ES_URL: https://my-elasticsearch-project-acc0da.es.europe-west1.gcp.elastic.cloud
+      ES_API_KEY: UjVrdVhKMEJxYnFHZ1pHbGxlMEI6Z2I2ZElOdmZYaG9MeDBOS0ZpSGp4Zw==
+      TMDB_API_KEY: 80dd03e7af0225d28da79ba60f81e842
+      # Mount your GCP service account key for local dev:
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/gcp-key.json
+    volumes:
+      - ./gcp-key.json:/secrets/gcp-key.json:ro   # place your key file here
+  frontend:
+    build: ./frontend
+    ports:
+      - "8501:8501"
+    environment:
+      BACKEND_URL: http://backend:8080
+    depends_on:
+      - backend

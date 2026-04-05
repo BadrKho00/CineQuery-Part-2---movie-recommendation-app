@@ -1,0 +1,29 @@
+# Google Cloud service account key - never commit this
+gcp-key.json
+*.json.key
+service-account*.json
+
+# Environment variable files with secrets
+backend.env.yaml
+*.env
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+
+# Streamlit
+.streamlit/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

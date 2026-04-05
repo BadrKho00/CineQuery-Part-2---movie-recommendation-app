@@ -1,0 +1,7 @@
+flask==3.0.3
+gunicorn==22.0.0
+google-cloud-bigquery==3.21.0
+google-auth==2.29.0
+db-dtypes==1.2.0
+elasticsearch==8.13.0
+requests==2.31.0

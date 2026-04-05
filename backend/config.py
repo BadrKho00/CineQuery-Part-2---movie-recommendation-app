@@ -9,12 +9,12 @@ BQ_LINKS_TABLE   = f"{GCP_PROJECT_ID}.{BQ_DATASET}.ml-small-links"
 BQ_MODEL         = f"{GCP_PROJECT_ID}.{BQ_DATASET}.recommender"
 
 # ── Elasticsearch ────────────────────────────────────────────────────────────
-ES_URL     = os.environ.get("ES_URL",     "https://my-elasticsearch-project-acc0da.es.europe-west1.gcp.elastic.cloud")
-ES_API_KEY = os.environ.get("ES_API_KEY", "UjVrdVhKMEJxYnFHZ1pHbGxlMEI6Z2I2ZElOdmZYaG9MeDBOS0ZpSGp4Zw==")
+ES_URL     = os.environ.get("ES_URL")
+ES_API_KEY = os.environ.get("ES_API_KEY")
 ES_INDEX   = "movies"
 
 # ── TMDB ─────────────────────────────────────────────────────────────────────
-TMDB_API_KEY    = os.environ.get("TMDB_API_KEY", "80dd03e7af0225d28da79ba60f81e842")
+TMDB_API_KEY    = os.environ.get("TMDB_API_KEY")
 TMDB_BASE_URL   = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 

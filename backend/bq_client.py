@@ -67,8 +67,10 @@ LIMIT {TOP_SIMILAR_USERS}
 
 def get_ml_recommendations(user_ids: list[int], exclude_movie_ids: list[int]) -> list[dict]:
     """
-    Use BigQuery ML RECOMMEND to get predictions for the similar users,
-    then aggregate by movie and exclude already-selected films.
+    Hybrid recommendations:
+    - ML.RECOMMEND predictions for similar users
+    - Boosted by movies the similar users actually rated highly
+    - Penalised by global popularity to avoid always showing blockbusters
     """
     if not user_ids:
         return []
@@ -81,30 +83,59 @@ def get_ml_recommendations(user_ids: list[int], exclude_movie_ids: list[int]) ->
         exclude_clause = f"AND r.movieId NOT IN ({exclude_str})"
 
     sql = f"""
-WITH recs AS (
-  SELECT
-    predicted_rating_im,
-    userId,
-    movieId
+WITH ml_recs AS (
+  -- BigQuery ML predicted ratings for similar users
+  SELECT predicted_rating_im, userId, movieId
   FROM ML.RECOMMEND(
     MODEL `{BQ_MODEL}`,
     (SELECT userId FROM UNNEST([{users_str}]) AS userId)
   )
+),
+actual_likes AS (
+  -- Movies the similar users actually rated highly in the dataset
+  SELECT movieId, COUNT(*) AS liked_by_similar
+  FROM `{BQ_RATINGS_TABLE}`
+  WHERE CAST(userId AS INT64) IN ({users_str})
+    AND rating_im >= {HIGH_RATING_THRESHOLD}
+  GROUP BY movieId
+),
+global_popularity AS (
+  -- How many users rated each movie overall (popularity penalty)
+  SELECT movieId, COUNT(*) AS total_ratings
+  FROM `{BQ_RATINGS_TABLE}`
+  GROUP BY movieId
+),
+aggregated AS (
+  SELECT
+    r.movieId,
+    AVG(r.predicted_rating_im)                        AS avg_predicted,
+    COUNT(DISTINCT r.userId)                           AS num_users_recommending,
+    COALESCE(MAX(al.liked_by_similar), 0)              AS actual_likes_count,
+    COALESCE(MAX(gp.total_ratings), 1)                 AS total_ratings
+  FROM ml_recs r
+  LEFT JOIN actual_likes  al ON r.movieId = al.movieId
+  LEFT JOIN global_popularity gp ON r.movieId = gp.movieId
+  WHERE r.predicted_rating_im IS NOT NULL
+    {exclude_clause}
+  GROUP BY r.movieId
 )
 SELECT
-  r.movieId,
+  a.movieId,
   m.title,
   m.genres,
   l.tmdbId,
-  ROUND(AVG(r.predicted_rating_im), 4)  AS avg_predicted_rating,
-  COUNT(DISTINCT r.userId)               AS num_users_recommending
-FROM recs r
-JOIN `{BQ_MOVIES_TABLE}` m ON r.movieId = m.movieId
-LEFT JOIN `{BQ_LINKS_TABLE}` l        ON r.movieId = l.movieId
-WHERE r.predicted_rating_im IS NOT NULL
-  {exclude_clause}
-GROUP BY r.movieId, m.title, m.genres, l.tmdbId
-ORDER BY num_users_recommending DESC, avg_predicted_rating DESC
+  ROUND(a.avg_predicted, 4) AS avg_predicted_rating,
+  a.num_users_recommending,
+  -- Hybrid score: ML prediction + actual like boost - log popularity penalty
+  ROUND(
+    a.avg_predicted
+    + (a.actual_likes_count * 0.05)
+    - (LOG(a.total_ratings) * 0.02),
+  4) AS hybrid_score
+FROM aggregated a
+JOIN `{BQ_MOVIES_TABLE}` m ON a.movieId = m.movieId
+LEFT JOIN `{BQ_LINKS_TABLE}` l ON a.movieId = l.movieId
+ORDER BY hybrid_score DESC
 LIMIT {TOP_N_RECOMMENDATIONS}
 """
     rows = _run(sql)
